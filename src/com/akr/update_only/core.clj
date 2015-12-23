@@ -72,9 +72,17 @@
                                                                    (to-array []))]
     (cond
      (nil? value)
-     (let [setter (setter-name prop)]
-       (println "Setting nil value for" prop " toarray[nil] = " (to-array [nil]))
-       (Reflector/setInstanceField obj prop nil))
+     (do
+       (let [setter (setter-name prop)
+             setter-meta (fetch-method reflector setter)
+             param-type (first (:parameter-types setter-meta))]
+         (println "Obj = " obj " Prop = " prop)
+         (println "Reflection = " (reflect obj))
+         ;; (println "Current value = " (Reflector/getInstanceField obj prop))
+         ;; (Reflector/setInstanceField obj prop nil)
+         (Reflector/invokeInstanceMethod obj
+                                       setter
+                                       (to-array [nil]))))
 
      (vector? value) nil
      
