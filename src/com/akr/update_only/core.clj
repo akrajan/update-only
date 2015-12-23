@@ -81,52 +81,30 @@
     (println prop " Type : " (class value) " -> " property-type)
     (println "class-name "(obj->class-name value))
 
-    (match [value (obj->class-name value) property-type]
+    (let [final-val
+          (match [value (obj->class-name value) property-type]
 
-           [nil _ _] (do
-                       (println "Setting " prop " to nil")
-                       (Reflector/invokeInstanceMethod obj
-                                                       setter
-                                                       (to-array [nil])))
-           [_ 'clojure.lang.PersistentArrayMap _] (do
-                                                   (println "Found nested object for " prop)
-                                                   (let [nested-object (get-nested-object obj reflector prop)]
-                                                     (update-with nested-object value)
-                                                     (Reflector/invokeInstanceMethod obj
-                                                                                     setter
-                                                                                     (to-array [nested-object]))))
+                 [nil _ _] (do
+                             (println "Setting " prop " to nil")
+                             nil)
+                 [_ 'clojure.lang.PersistentArrayMap _] (do
+                                                          (println "Found nested object for " prop)
+                                                          (let [nested-object (get-nested-object obj reflector prop)]
+                                                            (update-with nested-object value)
+                                                            nested-object))
+                 [_ 'clojure.lang.PersistentVector _] (do
+                                                        (println "#TODO: Found array for " prop)
+                                                        (java.util.ArrayList. []))
+                 [_ 'java.lang.Double  'java.lang.Float]    (float value)
+                 [_ 'java.lang.Float   'java.lang.Double]   (double value)
+                 [_ 'java.lang.Long    'java.lang.Integer]  (int value)
+                 [_ 'java.lang.Integer 'java.lang.Long]     (long value)
 
-           [_ 'clojure.lang.PersistentVector _] (do
-                                                  (println "#TODO: Found array for " prop))
+                 :else (cast (resolve property-type) value))]
 
-           [_ 'java.lang.Double 'java.lang.Float] (do
-                                                    ;; (println "#TODO: Convert double to float " prop)
-                                                    (Reflector/invokeInstanceMethod obj
-                                                       setter
-                                                       (to-array [(float value)])))
-
-           [_ 'java.lang.Float 'java.lang.Double] (do
-                                                    ;; (println "#TODO: Convert float to double " prop)
-                                                    (Reflector/invokeInstanceMethod obj
-                                                       setter
-                                                       (to-array [(double value)])))
-
-           [_ 'java.lang.Long 'java.lang.Integer] (do
-                                                    ;; (println "#TODO: Convert long to int" prop)
-                                                    (Reflector/invokeInstanceMethod obj
-                                                       setter
-                                                       (to-array [(int value)])))
-
-           [_ 'java.lang.Integer 'java.lang.Long] (do
-                                                    ;; (println "#TODO: Convert int to long" prop)
-                                                    (Reflector/invokeInstanceMethod obj
-                                                       setter
-                                                       (to-array [(long value)])))
-
-           :else (let [cast-value (cast (resolve property-type) value)]
-                   (Reflector/invokeInstanceMethod obj
-                                                   setter
-                                                   (to-array [cast-value]))))
+      (Reflector/invokeInstanceMethod obj
+                                      setter
+                                      (to-array [final-val])))
     obj))
 
 
