@@ -4,6 +4,7 @@
             [clojure.reflect :refer [reflect]]
             [clojure.set :as set]
             [clojure.pprint :refer [pprint]])
+  (:import [clojure.lang Reflector])
   (:gen-class :name com.pro.akr.UpdateOnly
               :methods [[updateWith [Object String] Object]]))
 
@@ -13,7 +14,7 @@
 (defmulti instantiate is-class?)
 
 (defmethod instantiate true [cls]
-  (clojure.lang.Reflector/invokeConstructor
+  (Reflector/invokeConstructor
    (resolve (symbol (replace-first (str cls) #".* " "")))
    (to-array [])))
 
@@ -37,19 +38,19 @@
 
 
 (defn get-nested-object [obj reflector property]
-  (let [cur-val (clojure.lang.Reflector/invokeInstanceMethod obj
+  (let [cur-val (Reflector/invokeInstanceMethod obj
                                                              (getter-name property)
                                                              (to-array []))]
     (or cur-val
         (let [member-type (:type (fetch-method reflector property))
-              member (clojure.lang.Reflector/invokeConstructor
+              member (Reflector/invokeConstructor
                       (resolve member-type)
                       (to-array []))]))))
 
 (declare update-with)
 
 (defn set-val [obj reflector prop value]
-  (let [current-value (clojure.lang.Reflector/invokeInstanceMethod obj
+  (let [current-value (Reflector/invokeInstanceMethod obj
                                                                    (getter-name prop)
                                                                    (to-array []))]
     (cond
@@ -61,7 +62,7 @@
            setter-meta (fetch-method reflector setter)
            param-type (first (:parameter-types setter-meta))]
        (update-with nested-object value)
-       (clojure.lang.Reflector/invokeInstanceMethod obj
+       (Reflector/invokeInstanceMethod obj
                                                     setter
                                                     (to-array [value])))
      :else
@@ -69,7 +70,6 @@
            setter-meta (fetch-method reflector setter)
            param-type (first (:parameter-types setter-meta))
            _ (println "casting " (class value) " -> " param-type)]
-
        (let [cast-value (if (= param-type (symbol "java.lang.Float"))
                           (do
                             (println "Detected float")
@@ -77,7 +77,7 @@
                           (cast (resolve param-type) value))]
          (println "value = " value " valueClass = " (class value))
          (println "cast-value = " value " castValueClass = " (class value))
-         (clojure.lang.Reflector/invokeInstanceMethod obj
+         (Reflector/invokeInstanceMethod obj
                                                       setter
                                                       (to-array [cast-value]))))))
   obj)
