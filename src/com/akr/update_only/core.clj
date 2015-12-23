@@ -9,17 +9,19 @@
               :methods [[updateWith [Object String] Object]]))
 
 (defn is-class? [x]
-  (instance? (class x) Class))
+  (let [result (instance? (class x) Class)]
+    (println "x = " x " result = " result)    
+    result))
 
 (defmulti instantiate is-class?)
 
 (defmethod instantiate true [cls]
+  (println "class name = " (symbol (replace-first (str cls) #".* " "")))
   (Reflector/invokeConstructor
    (resolve (symbol (replace-first (str cls) #".* " "")))
    (to-array [])))
 
 (defmethod instantiate false [x] x)
-
 
 (defn setter-name [property]
   (let [x (subs property 0 1)
@@ -69,6 +71,11 @@
                                                                    (getter-name prop)
                                                                    (to-array []))]
     (cond
+     (nil? value)
+     (let [setter (setter-name prop)]
+       (println "Setting nil value for" prop " toarray[nil] = " (to-array [nil]))
+       (Reflector/setInstanceField obj prop nil))
+
      (vector? value) nil
      
      (map? value)
@@ -77,9 +84,10 @@
            setter-meta (fetch-method reflector setter)
            param-type (first (:parameter-types setter-meta))]
        (update-with nested-object value)
+       (println "Going to call setter: " setter )
        (Reflector/invokeInstanceMethod obj
                                        setter
-                                       (to-array [value])))
+                                       (to-array [nested-object])))
      :else
      (let [setter (setter-name prop)
            setter-meta (fetch-method reflector setter)
@@ -91,10 +99,11 @@
                             (float value))
                           (cast (resolve param-type) value))]
          (println "value = " value " valueClass = " (class value))
-         (println "cast-value = " value " castValueClass = " (class value))
+         (println "cast-value = " cast-value " castValueClass = " (class value))
+         (println "setter = " setter)
          (Reflector/invokeInstanceMethod obj
-                                                      setter
-                                                      (to-array [cast-value]))))))
+                                         setter
+                                         (to-array [cast-value]))))))
   obj)
 
 
@@ -105,10 +114,10 @@
         r (reflect obj)]
     ;; (println "\nReflection:\n")
     ;; (pprint r)
+    (println "Request to apply values: " hash)
     (doseq [[k v] hash]
       (println "calling setval " k " = " v)
-      (set-val obj r k v)
-      )
+      (set-val obj r k v))
     obj))
 
 (defn -updateWith [self obj string]
