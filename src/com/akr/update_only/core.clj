@@ -56,25 +56,43 @@
      (vector? value) nil
      
      (map? value)
-     (let [nested-object (get-nested-object obj reflector prop)]
+     (let [nested-object (get-nested-object obj reflector prop)
+           setter (setter-name prop)
+           setter-meta (fetch-method reflector setter)
+           param-type (first (:parameter-types setter-meta))]
        (update-with nested-object value)
        (clojure.lang.Reflector/invokeInstanceMethod obj
-                                                  (setter-name prop)
-                                                  (to-array [value])))
+                                                    setter
+                                                    (to-array [value])))
      :else
-     (clojure.lang.Reflector/invokeInstanceMethod obj
-                                                  (setter-name prop)
-                                                  (to-array [value]))))
+     (let [setter (setter-name prop)
+           setter-meta (fetch-method reflector setter)
+           param-type (first (:parameter-types setter-meta))
+           _ (println "casting " (class value) " -> " param-type)]
+
+       (let [cast-value (if (= param-type (symbol "java.lang.Float"))
+                          (do
+                            (println "Detected float")
+                            (float value))
+                          (cast (resolve param-type) value))]
+         (println "value = " value " valueClass = " (class value))
+         (println "cast-value = " value " castValueClass = " (class value))
+         (clojure.lang.Reflector/invokeInstanceMethod obj
+                                                      setter
+                                                      (to-array [cast-value]))))))
   obj)
 
 
 (defn update-with [obj hash]
-  (print "Hello World")
+  (println "Input object: " obj)
+  (println "class(obj) = " (class obj))
   (let [obj (instantiate obj)
         r (reflect obj)]
+    (println "\nReflection:\n")
+    (pprint r)
     (doseq [[k v] hash]
-      (print "calling setval key = " k " ; value = " v)
-      ;(set-val obj r k v)
+      (println "calling setval " k " = " v)
+      (set-val obj r k v)
       )
     obj))
 
@@ -82,4 +100,5 @@
   (let [x (parse-string string)]
     (print "x =")
     (pprint x)
-    (update-with obj x)))
+    (update-with obj x)
+    (println "Called update-with")))
