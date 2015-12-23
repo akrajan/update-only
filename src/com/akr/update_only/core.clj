@@ -3,7 +3,8 @@
   (:require [cheshire.core :refer [parse-string]]
             [clojure.reflect :refer [reflect resolve-class]]
             [clojure.set :as set]
-            [clojure.pprint :refer [pprint]])
+            [clojure.pprint :refer [pprint]]
+            [clojure.core.match :refer [match]])
   (:import [clojure.lang Reflector])
   (:gen-class :name com.pro.akr.UpdateOnly
               :methods [[updateWith [Object String] Object]]))
@@ -68,38 +69,28 @@
 
 (defn set-val [obj reflector prop value]
   (let [current-value (Reflector/invokeInstanceMethod obj
-                                                                   (getter-name prop)
-                                                                   (to-array []))]
+                                                      (getter-name prop)
+                                                      (to-array []))
+        setter (setter-name prop)
+        setter-meta (fetch-method reflector setter)
+        param-type (first (:parameter-types setter-meta))]
+
     (cond
      (nil? value)
-     (do
-       (let [setter (setter-name prop)
-             setter-meta (fetch-method reflector setter)
-             param-type (first (:parameter-types setter-meta))]
-         (println "Obj = " obj " Prop = " prop)
-         (println "Reflection = " (reflect obj))
-         (Reflector/invokeInstanceMethod obj
-                                       setter
-                                       (to-array [nil]))))
-
+     (Reflector/invokeInstanceMethod obj
+                                         setter
+                                         (to-array [nil]))
      (vector? value) nil
      
      (map? value)
-     (let [nested-object (get-nested-object obj reflector prop)
-           setter (setter-name prop)
-           setter-meta (fetch-method reflector setter)
-           param-type (first (:parameter-types setter-meta))]
+     (let [nested-object (get-nested-object obj reflector prop)]
        (update-with nested-object value)
        (println "Going to call setter: " setter )
        (Reflector/invokeInstanceMethod obj
                                        setter
                                        (to-array [nested-object])))
      :else
-     (let [setter (setter-name prop)
-           setter-meta (fetch-method reflector setter)
-           param-type (first (:parameter-types setter-meta))
-           _ (println "casting " (class value) " -> " param-type)]
-       (let [cast-value (if (= param-type (symbol "java.lang.Float"))
+     (let [cast-value (if (= param-type (symbol "java.lang.Float"))
                           (do
                             (println "Detected float")
                             (float value))
@@ -109,8 +100,8 @@
          (println "setter = " setter)
          (Reflector/invokeInstanceMethod obj
                                          setter
-                                         (to-array [cast-value]))))))
-  obj)
+                                         (to-array [cast-value]))))
+    obj))
 
 
 (defn update-with [obj hash]
