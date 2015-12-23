@@ -5,7 +5,8 @@
             [clojure.set :as set]
             [clojure.pprint :refer [pprint]]
             [clojure.core.match :refer [match]])
-  (:import [clojure.lang Reflector])
+  (:import [clojure.lang Reflector]
+           [java.lang.reflect Field ParameterizedType])
   (:gen-class :name com.pro.akr.UpdateOnly
               :methods [[updateWith [Object String] Object]]))
 
@@ -18,9 +19,16 @@
 
 (defmethod instantiate true [cls]
   (println "class name = " (symbol (replace-first (str cls) #".* " "")))
-  (Reflector/invokeConstructor
-   (resolve (symbol (replace-first (str cls) #".* " "")))
-   (to-array [])))
+  (println "class name symbol: " (symbol (replace-first (str cls) #".* " "")))
+  (let [member-type (symbol (replace-first (str cls) #".* " ""))
+        abc `(new ~member-type)
+        _ (println "Going to eval: " abc)
+        x (eval abc)]
+    x)
+  ;; (Reflector/invokeConstructor
+  ;;  (resolve (symbol (replace-first (str cls) #".* " "")))
+  ;;  (to-array []))
+  )
 
 (defmethod instantiate false [x] x)
 
@@ -60,8 +68,8 @@
                 abc `(new ~member-type)
                 _ (println "Going to eval: " abc)
                 x (eval abc)]
-            (pprint "Created object: ")
-            (pprint (reflect x))
+            ;; (pprint "Created object: ")
+            ;; (pprint (reflect x))
             x)))))
           
 
@@ -71,6 +79,7 @@
   (symbol (replace-first (str (class obj)) #".* " "")))
 
 (defn set-val [obj reflector prop value]
+  (println "\nSetval:")
   (let [current-value (Reflector/invokeInstanceMethod obj
                                                       (getter-name prop)
                                                       (to-array []))
@@ -87,14 +96,17 @@
                  [nil _ _] (do
                              (println "Setting " prop " to nil")
                              nil)
-                 [_ 'clojure.lang.PersistentArrayMap _] (do
-                                                          (println "Found nested object for " prop)
-                                                          (let [nested-object (get-nested-object obj reflector prop)]
-                                                            (update-with nested-object value)
-                                                            nested-object))
-                 [_ 'clojure.lang.PersistentVector _] (do
-                                                        (println "#TODO: Found array for " prop)
-                                                        (java.util.ArrayList. []))
+                 [_ 'clojure.lang.PersistentArrayMap _] (let [nested-object (get-nested-object obj reflector prop)]
+                                                          (update-with nested-object value)
+                                                          nested-object)
+                 [_ 'clojure.lang.PersistentVector _] (let [klass (.. (class obj)
+                                                                      (getDeclaredField prop)
+                                                                      (getGenericType)
+                                                                      (getActualTypeArguments))
+                                                            klass (first klass)]
+                                                        (java.util.ArrayList. (for [x value
+                                                                                    :let [obj (instantiate klass)]]
+                                                                                (update-with obj x))))
                  [_ 'java.lang.Double  'java.lang.Float]    (float value)
                  [_ 'java.lang.Float   'java.lang.Double]   (double value)
                  [_ 'java.lang.Long    'java.lang.Integer]  (int value)
