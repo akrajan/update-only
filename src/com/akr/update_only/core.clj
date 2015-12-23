@@ -78,8 +78,6 @@
              param-type (first (:parameter-types setter-meta))]
          (println "Obj = " obj " Prop = " prop)
          (println "Reflection = " (reflect obj))
-         ;; (println "Current value = " (Reflector/getInstanceField obj prop))
-         ;; (Reflector/setInstanceField obj prop nil)
          (Reflector/invokeInstanceMethod obj
                                        setter
                                        (to-array [nil]))))
