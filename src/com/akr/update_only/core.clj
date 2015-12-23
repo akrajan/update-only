@@ -1,7 +1,7 @@
 (ns com.akr.update-only.core
   (:use [clojure.string :only (replace-first)])
   (:require [cheshire.core :refer [parse-string]]
-            [clojure.reflect :refer [reflect]]
+            [clojure.reflect :refer [reflect resolve-class]]
             [clojure.set :as set]
             [clojure.pprint :refer [pprint]])
   (:import [clojure.lang Reflector])
@@ -37,15 +37,30 @@
   (first (set/select #(= (:name %) (symbol method-name)) (:members reflector))))
 
 
+(defn construct [klass & args]
+  (.newInstance
+    (.getConstructor klass (into-array java.lang.Class (map type args)))
+    (object-array args)))
+
+
 (defn get-nested-object [obj reflector property]
   (let [cur-val (Reflector/invokeInstanceMethod obj
-                                                             (getter-name property)
-                                                             (to-array []))]
+                                                (getter-name property)
+                                                (to-array []))]
+    (println "get-nested-object: cur-val = " cur-val)
     (or cur-val
         (let [member-type (:type (fetch-method reflector property))
-              member (Reflector/invokeConstructor
-                      (resolve member-type)
-                      (to-array []))]))))
+              _ (println "Nested object member-type = " member-type " class = " (class member-type))
+              ;; _ (pprint reflector)
+              ]
+          (let [;x (construct (resolve-class (.getContextClassLoader (Thread/currentThread)) member-type))
+                abc `(new ~member-type)
+                _ (println "Going to eval: " abc)
+                x (eval abc)]
+            (pprint "Created object: ")
+            (pprint (reflect x))
+            x)))))
+          
 
 (declare update-with)
 
@@ -63,8 +78,8 @@
            param-type (first (:parameter-types setter-meta))]
        (update-with nested-object value)
        (Reflector/invokeInstanceMethod obj
-                                                    setter
-                                                    (to-array [value])))
+                                       setter
+                                       (to-array [value])))
      :else
      (let [setter (setter-name prop)
            setter-meta (fetch-method reflector setter)
@@ -88,8 +103,8 @@
   (println "class(obj) = " (class obj))
   (let [obj (instantiate obj)
         r (reflect obj)]
-    (println "\nReflection:\n")
-    (pprint r)
+    ;; (println "\nReflection:\n")
+    ;; (pprint r)
     (doseq [[k v] hash]
       (println "calling setval " k " = " v)
       (set-val obj r k v)
