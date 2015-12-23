@@ -67,40 +67,66 @@
 
 (declare update-with)
 
+(defn obj->class-name [obj]
+  (symbol (replace-first (str (class obj)) #".* " "")))
+
 (defn set-val [obj reflector prop value]
   (let [current-value (Reflector/invokeInstanceMethod obj
                                                       (getter-name prop)
                                                       (to-array []))
         setter (setter-name prop)
         setter-meta (fetch-method reflector setter)
-        param-type (first (:parameter-types setter-meta))]
+        property-type (first (:parameter-types setter-meta))]
+    (println prop " Value: " current-value " -> " value)
+    (println prop " Type : " (class value) " -> " property-type)
+    (println "class-name "(obj->class-name value))
 
-    (cond
-     (nil? value)
-     (Reflector/invokeInstanceMethod obj
-                                         setter
-                                         (to-array [nil]))
-     (vector? value) nil
-     
-     (map? value)
-     (let [nested-object (get-nested-object obj reflector prop)]
-       (update-with nested-object value)
-       (println "Going to call setter: " setter )
-       (Reflector/invokeInstanceMethod obj
-                                       setter
-                                       (to-array [nested-object])))
-     :else
-     (let [cast-value (if (= param-type (symbol "java.lang.Float"))
-                          (do
-                            (println "Detected float")
-                            (float value))
-                          (cast (resolve param-type) value))]
-         (println "value = " value " valueClass = " (class value))
-         (println "cast-value = " cast-value " castValueClass = " (class value))
-         (println "setter = " setter)
-         (Reflector/invokeInstanceMethod obj
-                                         setter
-                                         (to-array [cast-value]))))
+    (match [value (obj->class-name value) property-type]
+
+           [nil _ _] (do
+                       (println "Setting " prop " to nil")
+                       (Reflector/invokeInstanceMethod obj
+                                                       setter
+                                                       (to-array [nil])))
+           [_ 'clojure.lang.PersistentArrayMap _] (do
+                                                   (println "Found nested object for " prop)
+                                                   (let [nested-object (get-nested-object obj reflector prop)]
+                                                     (update-with nested-object value)
+                                                     (Reflector/invokeInstanceMethod obj
+                                                                                     setter
+                                                                                     (to-array [nested-object]))))
+
+           [_ 'clojure.lang.PersistentVector _] (do
+                                                  (println "#TODO: Found array for " prop))
+
+           [_ 'java.lang.Double 'java.lang.Float] (do
+                                                    ;; (println "#TODO: Convert double to float " prop)
+                                                    (Reflector/invokeInstanceMethod obj
+                                                       setter
+                                                       (to-array [(float value)])))
+
+           [_ 'java.lang.Float 'java.lang.Double] (do
+                                                    ;; (println "#TODO: Convert float to double " prop)
+                                                    (Reflector/invokeInstanceMethod obj
+                                                       setter
+                                                       (to-array [(double value)])))
+
+           [_ 'java.lang.Long 'java.lang.Integer] (do
+                                                    ;; (println "#TODO: Convert long to int" prop)
+                                                    (Reflector/invokeInstanceMethod obj
+                                                       setter
+                                                       (to-array [(int value)])))
+
+           [_ 'java.lang.Integer 'java.lang.Long] (do
+                                                    ;; (println "#TODO: Convert int to long" prop)
+                                                    (Reflector/invokeInstanceMethod obj
+                                                       setter
+                                                       (to-array [(long value)])))
+
+           :else (let [cast-value (cast (resolve property-type) value)]
+                   (Reflector/invokeInstanceMethod obj
+                                                   setter
+                                                   (to-array [cast-value]))))
     obj))
 
 
