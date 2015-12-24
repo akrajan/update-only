@@ -136,6 +136,16 @@
       (set-val obj r k v))
     obj))
 
+(defn create-array-with [obj hash]
+  (let [generic-classes (.. (class obj)
+                          (getGenericType)
+                          (getActualTypeArguments))
+        klass (first generic-classes)]
+    (println "Array klass = " + klass)))
+
 (defn -updateWith [self obj string]
-  (with-out-str
-    (update-with obj (parse-string string))))
+  (do  ;with-out-str
+    (let [hsh (parse-string string)]
+      (cond (= (empty hsh) {}) (update-with obj hsh)
+            (= (empty hash [])) (create-array-with obj hash)
+            :else hsh))))
