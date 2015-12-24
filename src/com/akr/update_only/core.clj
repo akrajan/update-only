@@ -12,7 +12,7 @@
 
 
 (gen-interface
- :name com.pro.akr.Equalizer
+ :name com.pro.akr.Comparator
  :methods [[isSame [Object] Boolean]])
 
 
@@ -95,9 +95,36 @@
                                                                       (getGenericType)
                                                                       (getActualTypeArguments))
                                                             klass (first klass)]
-                                                        (java.util.ArrayList. (for [x value
-                                                                                    :let [obj (instantiate klass)]]
-                                                                                (update-with obj x))))
+                                                        
+                                                        (let [new-array (do
+                                                                          (println klass "Not instance of comparator")
+                                                                          (for [x value
+                                                                                :let [obj (instantiate klass)]]
+                                                                            (update-with obj x)))
+                                                              ;; new-array (if (instance? com.pro.akr.Comparator (instantiate klass))
+                                                              ;;             (let [existing-array (into [] current-value)]
+                                                              ;;               (println klass "Instance of comparator")
+                                                              ;;               (for [x value
+                                                              ;;                     :let [empty-object (instantiate klass)
+                                                              ;;                           candidate-object (update-with obj x)]]
+                                                              ;;                 (if-let [existing-elem (some (fn [existing-elem]
+                                                              ;;                                                (and (. existing-elem isSame candidate-object)
+                                                              ;;                                                     (or (println "updating existing element") true)
+                                                              ;;                                                     existing-elem))
+                                                              ;;                                              existing-array)]
+                                                              ;;                   (update-with existing-elem x)
+                                                              ;;                   candidate-object)))
+
+                                                              ;;             (do
+                                                              ;;               (println klass "Not instance of comparator")
+                                                              ;;               (for [x value
+                                                              ;;                     :let [obj (instantiate klass)]]
+                                                              ;;                 (update-with obj x))))
+                                                              ]
+                                                          (println "Array length: " (count new-array))
+                                                          (let [x (java.util.ArrayList. new-array)]
+                                                            (println "Array size = " + (. x size))
+                                                            x)))
                  [_ 'java.lang.Double  'java.lang.Float]    (float value)
                  [_ 'java.lang.Float   'java.lang.Double]   (double value)
                  [_ 'java.lang.Long    'java.lang.Integer]  (int value)
