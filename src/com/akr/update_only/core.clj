@@ -8,7 +8,8 @@
   (:import [clojure.lang Reflector]
            [java.lang.reflect Field ParameterizedType])
   (:gen-class :name com.pro.akr.UpdateOnly
-              :methods [[updateWith [Object String] Object]]))
+              :methods [[updateWith [Object String] Object]
+                        [toArray [String Class] Object]]))
 
 
 (gen-interface
@@ -136,16 +137,23 @@
       (set-val obj r k v))
     obj))
 
-(defn create-array-with [obj hash]
-  (let [generic-classes (.. (class obj)
-                          (getGenericType)
-                          (getActualTypeArguments))
-        klass (first generic-classes)]
-    (println "Array klass = " + klass)))
+(defn create-array-with [arr klass]
+  (for [x arr
+        :let [obj (instantiate klass)]]
+    (do
+      (update-with obj x)
+      obj)))
 
 (defn -updateWith [self obj string]
   (do  ;with-out-str
     (let [hsh (parse-string string)]
       (cond (= (empty hsh) {}) (update-with obj hsh)
-            (= (empty hash [])) (create-array-with obj hash)
+            (= (empty hsh) []) (throw "Array class unspecified.")
             :else hsh))))
+
+
+(defn -toArray [self string klass]
+  (do  ;with-out-str
+    (let [hsh (parse-string string)]
+      (cond (= (empty hsh) []) (create-array-with hsh klass)
+            :else (throw "Not an array.")))))
