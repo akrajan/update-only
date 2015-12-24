@@ -130,22 +130,13 @@
 
 
 (defn update-with [obj hash]
-  (println "Input object: " obj)
-  (println "class(obj) = " (class obj))
   (let [obj (instantiate obj)
         r (reflect obj)]
-    ;; (println "\nReflection:\n")
-    ;; (pprint r)
-    (println "Request to apply values: " hash)
+    (println "Update obj " obj " with: " hash)
     (doseq [[k v] hash]
-      (println "calling setval " k " = " v)
       (set-val obj r k v))
     obj))
 
 (defn -updateWith [self obj string]
   (with-out-str
-   (let [x (parse-string string)]
-     (print "x =")
-     (pprint x)
-     (update-with obj x)
-     (println "Called update-with"))))
+    (update-with obj (parse-string string))))
