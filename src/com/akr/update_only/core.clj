@@ -10,6 +10,12 @@
   (:gen-class :name com.pro.akr.UpdateOnly
               :methods [[updateWith [Object String] Object]]))
 
+
+(gen-interface
+ :name com.pro.akr.Equalizer
+ :methods [[isSame [Object] Boolean]])
+
+
 (defn is-class? [x] (instance? (class x) Class))
 
 (defmulti instantiate is-class?)
@@ -57,8 +63,6 @@
                 abc `(new ~member-type)
                 _ (println "Going to eval: " abc)
                 x (eval abc)]
-            ;; (pprint "Created object: ")
-            ;; (pprint (reflect x))
             x)))))
           
 
