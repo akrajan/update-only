@@ -143,8 +143,9 @@
     obj))
 
 (defn -updateWith [self obj string]
-  (let [x (parse-string string)]
-    (print "x =")
-    (pprint x)
-    (update-with obj x)
-    (println "Called update-with")))
+  (with-out-str
+   (let [x (parse-string string)]
+     (print "x =")
+     (pprint x)
+     (update-with obj x)
+     (println "Called update-with"))))
