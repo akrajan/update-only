@@ -10,25 +10,14 @@
   (:gen-class :name com.pro.akr.UpdateOnly
               :methods [[updateWith [Object String] Object]]))
 
-(defn is-class? [x]
-  (let [result (instance? (class x) Class)]
-    (println "x = " x " result = " result)    
-    result))
+(defn is-class? [x] (instance? (class x) Class))
 
 (defmulti instantiate is-class?)
 
 (defmethod instantiate true [cls]
-  (println "class name = " (symbol (replace-first (str cls) #".* " "")))
-  (println "class name symbol: " (symbol (replace-first (str cls) #".* " "")))
   (let [member-type (symbol (replace-first (str cls) #".* " ""))
-        abc `(new ~member-type)
-        _ (println "Going to eval: " abc)
-        x (eval abc)]
-    x)
-  ;; (Reflector/invokeConstructor
-  ;;  (resolve (symbol (replace-first (str cls) #".* " "")))
-  ;;  (to-array []))
-  )
+        new-obj-statement `(new ~member-type)]
+    (eval new-obj-statement)))
 
 (defmethod instantiate false [x] x)
 
@@ -93,9 +82,7 @@
     (let [final-val
           (match [value (obj->class-name value) property-type]
 
-                 [nil _ _] (do
-                             (println "Setting " prop " to nil")
-                             nil)
+                 [nil _ _] nil
                  [_ 'clojure.lang.PersistentArrayMap _] (let [nested-object (get-nested-object obj reflector prop)]
                                                           (update-with nested-object value)
                                                           nested-object)
@@ -112,7 +99,9 @@
                  [_ 'java.lang.Long    'java.lang.Integer]  (int value)
                  [_ 'java.lang.Integer 'java.lang.Long]     (long value)
 
-                 :else (cast (resolve property-type) value))]
+                 :else (-> property-type
+                           (resolve)
+                           (cast value)))]
 
       (Reflector/invokeInstanceMethod obj
                                       setter
