@@ -19,14 +19,27 @@
 
 (defn is-class? [x] (instance? (class x) Class))
 
-(defmulti instantiate is-class?)
+(defn param-type [x]
+  (cond
+   (and (class? x) (. x isEnum)) :enum
+   (class? x) :class
+   :else :object))
 
-(defmethod instantiate true [cls]
+(defmulti instantiate param-type)
+
+(defmethod instantiate :class [cls]
+  (println "instantiate: is-class = true")
   (let [member-type (symbol (replace-first (str cls) #".* " ""))
         new-obj-statement `(new ~member-type)]
     (eval new-obj-statement)))
 
-(defmethod instantiate false [x] x)
+(defmethod instantiate :object [x]
+  (println "instantiate: is-class = true")
+  x)
+
+(defmethod instantiate :enum [x]
+  (println "Found enum")
+  x)
 
 (defn setter-name [property]
   (let [x (subs property 0 1)
@@ -69,8 +82,25 @@
 
 (declare update-with)
 
+(defn construct [klass & args]
+  (clojure.lang.Reflector/invokeConstructor klass (into-array Object args)))
+
 (defn obj->class-name [obj]
   (symbol (replace-first (str (class obj)) #".* " "")))
+
+(defn enum? [reflector]
+  (contains? (or (:bases reflector) #{})
+             'java.lang.Enum))
+
+(defn get-class-by-name [klass-name]
+  (try
+    (. Class forName (str klass-name))
+    (catch Exception e
+      nil)))
+
+(defn is-enum-class-name? [enum-name]
+  (if-let [klass (get-class-by-name enum-name)]
+    (enum? (reflect klass))))
 
 (defn set-val [obj reflector prop value]
   (println "\nSetval:")
@@ -79,19 +109,20 @@
                                                       (to-array []))
         setter (setter-name prop)
         setter-meta (fetch-method reflector setter)
-        property-type (first (:parameter-types setter-meta))]
+        property-type (first (:parameter-types setter-meta))
+        is-enum-property? (is-enum-class-name? property-type)]
     (println prop " Value: " current-value " -> " value)
     (println prop " Type : " (class value) " -> " property-type)
-    (println "class-name "(obj->class-name value))
+    (println "class-name "(obj->class-name value) " enum-check = " is-enum-property?)
 
     (let [final-val
-          (match [value (obj->class-name value) property-type]
+          (match [value (obj->class-name value) property-type is-enum-property?]
 
-                 [nil _ _] nil
-                 [_ 'clojure.lang.PersistentArrayMap _] (let [nested-object (get-nested-object obj reflector prop)]
+                 [nil _ _ _] nil
+                 [_ 'clojure.lang.PersistentArrayMap _ _] (let [nested-object (get-nested-object obj reflector prop)]
                                                           (update-with nested-object value)
                                                           nested-object)
-                 [_ 'clojure.lang.PersistentVector _] (let [generic-classes (.. (class obj)
+                 [_ 'clojure.lang.PersistentVector _ _] (let [generic-classes (.. (class obj)
                                                                                 (getDeclaredField prop)
                                                                                 (getGenericType)
                                                                                 (getActualTypeArguments))
@@ -113,15 +144,16 @@
                                                                             obj)))]
                                                         (java.util.ArrayList. new-array))
 
-                 [_ 'java.lang.Double  'java.lang.Float]    (float value)
-                 [_ 'java.lang.Integer 'java.lang.Double]   (double value)
-                 [_ 'java.lang.Float   'java.lang.Double]   (double value)
-                 [_ 'java.lang.Long    'java.lang.Integer]  (int value)
-                 [_ 'java.lang.Integer 'java.lang.Long]     (long value)
-
+                 [_ 'java.lang.Double  'java.lang.Float   _]   (float value)
+                 [_ 'java.lang.Integer 'java.lang.Double  _]   (double value)
+                 [_ 'java.lang.Float   'java.lang.Double  _]   (double value)
+                 [_ 'java.lang.Long    'java.lang.Integer _]   (int value)
+                 [_ 'java.lang.Integer 'java.lang.Long    _]   (long value)
+                 [_ 'java.lang.String  _               true]   (let [klass (get-class-by-name property-type)]
+                                                                 (Reflector/invokeStaticMethod klass "valueOf" (to-array [value])))
                  :else (-> property-type
-                           (resolve)
-                           (cast value)))]
+                             (resolve)
+                             (cast value)))]
 
       (Reflector/invokeInstanceMethod obj
                                       setter
@@ -145,7 +177,7 @@
       obj)))
 
 (defn -updateWith [self obj string]
-  (do  ;with-out-str
+  (with-out-str
     (let [hsh (parse-string string)]
       (cond (= (empty hsh) {}) (update-with obj hsh)
             (= (empty hsh) []) (throw "Array class unspecified.")
